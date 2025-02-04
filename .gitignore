@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -189,3 +190,5 @@ env/
 # Environment variables
 .env
 >>>>>>> 34d6cda (Commit)
+=======
+>>>>>>> 100ce11 (commit)
