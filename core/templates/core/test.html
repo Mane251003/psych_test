@@ -1,0 +1,19 @@
+
+<h2>Take the Test</h2>
+<form method="post">
+    {% csrf_token %}
+    
+    {% for question in questions %}
+        <div>
+            <p><strong>{{ question.text }}</strong></p>
+            {% for choice in question.get_choices %}
+                <label>
+                    <input type="radio" name="{{ question.id }}" value="{{ choice }}" required>
+                    {{ choice }}
+                </label><br>
+            {% endfor %}
+        </div>
+    {% endfor %}
+    
+    <button type="submit">Submit</button>
+</form>

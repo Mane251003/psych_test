@@ -1,0 +1,8 @@
+<form method="GET">
+    <input type="text" name="prompt" placeholder="Գրիր հարցդ..." required>
+    <button type="submit">Ուղարկել</button>
+</form>
+
+{% if response %}
+    <p><strong>AI-ի պատասխանը:</strong> {{ response }}</p>
+{% endif %}
