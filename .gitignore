@@ -1,5 +1,4 @@
 <<<<<<< HEAD
-<<<<<<< HEAD
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -171,24 +170,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-=======
-*.log
-*.pot
-*.pyc
-__pycache__/
-db.sqlite3
-media/
 
-# Virtual Environment
-venv/
-env/
 
-# IDE
-.vscode/
-.idea/
-
-# Environment variables
 .env
->>>>>>> 34d6cda (Commit)
-=======
->>>>>>> 100ce11 (commit)
