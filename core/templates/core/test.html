@@ -1,19 +1,47 @@
+{% extends 'core/base.html' %}
 
-<h2>Take the Test</h2>
-<form method="post">
+
+
+{%block content%}
+<!-- templates/core/test.html -->
+<form method="POST">
     {% csrf_token %}
     
-    {% for question in questions %}
-        <div>
-            <p><strong>{{ question.text }}</strong></p>
-            {% for choice in question.get_choices %}
-                <label>
-                    <input type="radio" name="{{ question.id }}" value="{{ choice }}" required>
-                    {{ choice }}
-                </label><br>
-            {% endfor %}
-        </div>
+    <h2>{{ test.name }}</h2>
+    
+    {% for q in questions %}
+      <div>
+        <p><strong>{{ q.title }}</strong></p>
+        
+        {% if q.question_type == 'yes_no' %}
+          <label>
+            <input type="radio" name="question_{{ q.id }}" value="Այո" required> Այո
+          </label>
+          <label>
+            <input type="radio" name="question_{{ q.id }}" value="Ոչ" required> Ոչ
+          </label>
+  
+        {% elif q.question_type == 'multiple_choice' %}
+          {% for opt in q.get_options %}
+            <label>
+              <input type="radio" name="question_{{ q.id }}" value="{{ opt }}" required> {{ opt }}
+            </label>
+          {% endfor %}
+  
+        {% elif q.question_type == 'open_text' %}
+          <textarea name="question_{{ q.id }}" rows="3" cols="50" required></textarea>
+  
+        {% elif q.question_type == 'rating_scale' %}
+          <input type="number" 
+                 name="question_{{ q.id }}" 
+                 min="{{ q.scale_min }}" 
+                 max="{{ q.scale_max }}" 
+                 required>
+        {% endif %}
+      </div>
     {% endfor %}
     
-    <button type="submit">Submit</button>
-</form>
+    <button type="submit" class="btn btn-primary">Submit</button>
+  </form>
+  
+{%endblock%}

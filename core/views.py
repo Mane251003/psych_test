@@ -1,7 +1,8 @@
-from django.shortcuts import render, redirect, HttpResponse
-from .models import Question, Answer, Result
+from django.shortcuts import render, redirect, HttpResponse, get_object_or_404
+from .models import Question, Answer, Result, PsychoTest, TestSession, Response
 from django.utils.timezone import now
 
+from django.http import JsonResponse
 from django.db.models import Max
 from .forms import AnswerForm
 
@@ -10,7 +11,111 @@ import openai
 from openai import OpenAI
 
 
+from core.scoring import TestEvaluator
 
+def test_list(request):
+    tests=PsychoTest.objects.filter(is_active=True)
+    return render(request, 'core/test_list.html', {'tests':tests})
+
+def start_test(request,test_id):
+    test=get_object_or_404(PsychoTest, id=test_id)
+    questions=test.questions.all().order_by('order')
+
+  
+    session, created =TestSession.objects.get_or_create(
+        candidate=request.user, 
+        test=test,
+        is_completed=False)
+
+    if request.method=='POST':
+        for question in questions:
+            field_name=f'question_{question.id}'
+            user_input=request.POST.get(field_name, '').strip()
+
+            if question.question_type=='rating_scale':
+                scale_val=int(user_input) if user_input else None
+                Response.objects.update_or_create(
+                    session=session,
+                    question=question,
+                    response_time=now(),
+                    defaults={'scale_value': scale_val}
+                )
+            elif question.question_type=='multiple_choice':
+                Response.objects.update_or_create(
+                    session=session,
+                    question=question,
+                    response_time=now(),
+                    defaults={'choice': user_input}
+                )
+            elif question.question_type=='open_text':
+                Response.objects.update_or_create(
+                    session=session,
+                    question=question,
+                    defaults={'choice': user_input}
+                )
+
+        session.is_completed=True
+        session.end_time=now()
+        session.save()
+
+
+        evaluator=TestEvaluator(session)
+        results=evaluator.calculate_results()
+
+        Result.objects.update_or_create(
+            session=session,
+            defaults={
+                 'theoretical_scores': results['theoretical_scores'], 
+                 'scenario_analysis': results['scenario_analysis'],
+                 'scale_evaluations': results['scale_evaluations'],
+                 'free_response_analysis': results.get('free_response_analysis', '') 
+
+            }
+        )
+
+        return redirect('result', session_id=session.id)
+    
+
+
+    context={'test':test,
+             'session':session,
+             'questions':questions}
+    
+    return render(request, 'core/test.html', context)
+
+def submit_response(request):
+    if request.method=='POST':
+        session_id=request.POST.get('session_id')
+        question_id=request.POST.get('question_id')
+        answer_id=request.POST.get('answer_id')
+
+        session=get_object_or_404(TestSession, id=session_id, candidate=request.user)
+        question=get_object_or_404(Question, id=question_id, test=session.test)
+        answer=get_object_or_404(Answer, id=answer_id, question=question)
+        Response.objects.create(
+            session=session,
+            question=question,
+            answer=answer
+        )
+        return JsonResponse({'status': "success"})
+    return JsonResponse({'status': 'error'}, status=400)
+
+def result(request, session_id):
+    session=get_object_or_404(TestSession, id=session_id, candidate=request.user)
+    try:
+        result=Result.objects.get(session=session)
+    except Result.DoesNotExist:
+        return render(request, 'core/no_result.html', {'session':session})
+  
+    return render(request, 'core/result.html', {'result': result, 'session':session})
+   
+   
+   
+  #  result=get_object_or_404(Result, session=session)
+ 
+
+
+#avel
 def take_test(request):
     questions=Question.objects.all()
     if request.method=='POST':
@@ -24,7 +129,7 @@ def take_test(request):
                 test_date=test_date
             )
         return redirect('result')
-    return render(request, 'core/test.html', {'questions': questions})
+    return render(request, 'core/testt.html', {'questions': questions})
 
 def resultt(request):
     scores=Answer.objects.filter(user=request.user.username).first()
@@ -34,7 +139,7 @@ def resultt(request):
     return render(request, 'core/result.html', {'scores':scores})
 
 
-def result(request):
+def resulttt(request):
     latest_test=Answer.objects.filter(user=request.user.username).aggregate(latest_date=Max('test_date'))['latest_date']
     print(latest_test)
     user_answers=Answer.objects.filter(user=request.user.username, test_date=latest_test)

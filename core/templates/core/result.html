@@ -1,0 +1,33 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div class="report">
+    <h1>Test Results</h1>
+    
+    <div class="section">
+        <h2>Personality Traits</h2>
+        <ul class="traits">
+            {% for trait, score in result.theoretical_scores.items %}
+            <li>
+                <span class="trait-name">{{ trait|title }}</span>
+                <div class="progress">
+                    <div class="progress-bar" >{{ score|floatformat:1 }}</div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Scale Evaluations</h2>
+        <div class="scales">
+            {% for scale, value in result.scale_evaluations.items %}
+            <div class="scale">
+                <h3>{{ scale|title }}</h3>
+                <div class="scale-value">{{ value|floatformat:1 }}/10</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
