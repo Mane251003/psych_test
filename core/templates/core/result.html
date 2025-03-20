@@ -3,7 +3,7 @@
 {% block content %}
 <div class="report">
     <h1>Test Results</h1>
-    
+    <!--
     <div class="section">
         <h2>Personality Traits</h2>
         <ul class="traits">
@@ -29,5 +29,16 @@
             {% endfor %}
         </div>
     </div>
+-->
+    {% for code, data in result.interpretation.items%}
+    <div class="trait">
+        <h4>{{score}}</h4>
+        <h3> {{data.name}} ({{code}})</h3>
+       <!-- <div class="score-graphic"> {{data.graphic}}</div> -->
+        <p class="description"> Description {{data.description}}</p>
+
+    </div>
+    {%endfor%}
+
 </div>
 {% endblock %}

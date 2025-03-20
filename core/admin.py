@@ -28,7 +28,7 @@ class QuestionAdmin(admin.ModelAdmin):
     
     fieldsets = (
         (None, {
-            'fields': ('title', 'test', 'order', 'trait', 'weight', 'question_type')
+            'fields': ('title', 'test', 'order', 'key','trait', 'weight', 'question_type')
         }),
         ('Multiple Choice Options', {
             'fields': ('multiple_choices',),
@@ -42,7 +42,7 @@ class QuestionAdmin(admin.ModelAdmin):
         }),
         ('Rating Scale Options', {
             'fields':('scale_min', 'scale_max'),
-            'classes':('collapse'),
+            'classes':('collapse',),
             'description': 'Ընտրեք բալային համակարգը'
         })
     )
@@ -50,10 +50,11 @@ class QuestionAdmin(admin.ModelAdmin):
     
     def get_fields(self, request, obj=None):
         
-        fields = list(super().get_fields(request, obj))
+        fields = super().get_fields(request, obj)
         if obj:
             if obj.question_type == 'yes_no':
-                fields = [f for f in fields if f not in ('multiple_choices', 'open_text_prompt', 'scale_min', 'scale_max')]
+               
+                fields = [f for f in fields if f not in ('open_text_prompt', 'scale_min', 'scale_max')]
             elif obj.question_type == 'multiple_choice':
                 fields = [f for f in fields if f not in ('open_text_prompt', 'scale_min', 'scale_max')]
             elif obj.question_type == 'open_text':
@@ -62,6 +63,13 @@ class QuestionAdmin(admin.ModelAdmin):
                 fields = [f for f in fields if f not in ('multiple_choices', 'open_text_prompt')]
 
         return fields
+    
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields=super().get_readonly_fields(request, obj)
+        if obj and obj.question_type == 'yes_no':
+            return list(readonly_fields)+['multiple_choices']
+        return readonly_fields
 
 
 
@@ -70,7 +78,7 @@ class QuestionAdmin(admin.ModelAdmin):
         """Auto-populate yes/no options and validate data"""
         if obj.question_type == 'yes_no':
             
-            obj.multiple_choices = ['Այո', 'Ոչ']
+            obj.multiple_choices =json.dumps([{"text": "Այո", "value": 1}, {"text": "Ոչ", "value": 0}])
             obj.open_text_prompt = None
             obj.scale_min=None
             obj.scale_max=None
@@ -100,10 +108,6 @@ class QuestionAdmin(admin.ModelAdmin):
         
 
 
-    def get_readonly_fields(self, request, obj=None):
-        if obj and obj.question_type == 'yes_no':
-            return ('multiple_choices','open_text_prompt', 'scale_max', 'scale_min')
-        return super().get_readonly_fields(request, obj)
 
 
     class Media:
@@ -125,6 +129,12 @@ class ResultAdmin(admin.ModelAdmin):
 
     def summary(self, obj):
         return f"Theory: {len(obj.theoretical_scores)} traits, Scales: {len(obj.scale_evaluations)}"
+
+
+@admin.register(Trait)
+class TraitAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name', 'reverse_scored')
+    search_fields = ('name', 'description')
 
 
 admin.site.register(Response)

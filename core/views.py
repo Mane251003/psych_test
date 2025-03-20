@@ -5,11 +5,12 @@ from django.utils.timezone import now
 from django.http import JsonResponse
 from django.db.models import Max
 from .forms import AnswerForm
+from django.db import transaction
 
 from .utils.gemini import get_gemini_response
 import openai
 from openai import OpenAI
-
+from .scoring import BigFiveScorer, BigFiveScorerrrr
 
 from core.scoring import TestEvaluator
 
@@ -18,6 +19,21 @@ def test_list(request):
     return render(request, 'core/test_list.html', {'tests':tests})
 
 def start_test(request,test_id):
+    sessions=get_object_or_404(TestSession, id=16)
+    pordz=BigFiveScorer(sessions)
+    #pordz._calculate_base_scores()
+    #print(pordz)
+    trait_scores, max_scores=pordz._calculate_base_scores()
+    print(f"trait score is {trait_scores}")
+    print(f"max score is {max_scores} ")
+
+    normalized=pordz._normalize_scores(trait_scores, max_scores)
+    print(f'Normilized is {normalized}')
+    print(f"generate interpretion is {pordz._generate_interpretation(normalized) }")
+   # print(f"generate recommendation is {pordz._generate_recommendations(normalized)}")
+
+
+
     test=get_object_or_404(PsychoTest, id=test_id)
     questions=test.questions.all().order_by('order')
 
@@ -26,7 +42,9 @@ def start_test(request,test_id):
         candidate=request.user, 
         test=test,
         is_completed=False)
-
+    print(f"session is {session}")
+    print(f"session_id {session.id}")
+    print(f"created is {created}")
     if request.method=='POST':
         for question in questions:
             field_name=f'question_{question.id}'
@@ -40,6 +58,8 @@ def start_test(request,test_id):
                     response_time=now(),
                     defaults={'scale_value': scale_val}
                 )
+            
+
             elif question.question_type=='multiple_choice':
                 Response.objects.update_or_create(
                     session=session,
@@ -51,25 +71,41 @@ def start_test(request,test_id):
                 Response.objects.update_or_create(
                     session=session,
                     question=question,
+                    response_time=now(),
                     defaults={'choice': user_input}
                 )
+            elif question.question_type=='yes_no':
+                yes_no=request.POST.get(field_name, '').strip()
+                Response.objects.update_or_create(
+                    session=session,
+                    question=question,
+                    response_time=now(),
+                    defaults={'choice': yes_no}
+                )
+
 
         session.is_completed=True
         session.end_time=now()
         session.save()
 
+        
+        bigfive_scorer=BigFiveScorer(session)
+        results=bigfive_scorer.calculate_results()
 
-        evaluator=TestEvaluator(session)
-        results=evaluator.calculate_results()
+        #evaluator=TestEvaluator(session)
+        #results=evaluator.calculate_results()
+
 
         Result.objects.update_or_create(
             session=session,
             defaults={
-                 'theoretical_scores': results['theoretical_scores'], 
-                 'scenario_analysis': results['scenario_analysis'],
-                 'scale_evaluations': results['scale_evaluations'],
-                 'free_response_analysis': results.get('free_response_analysis', '') 
-
+                 'raw_scores': results['raw_scores'],
+                 'normalized_scores': results['normalized_scores'],
+                 'interpretation': results['interpretation'],
+                 'theoretical_scores': 'inin',#results['theoretical_scores'], 
+                 'scenario_analysis': '12',#results['scenario_analysis'],
+                 'scale_evaluations': 'ubu',#results['scale_evaluations'],
+                 'free_response_analysis': 'ub',#results.get('free_response_analysis', '') 
             }
         )
 
@@ -87,25 +123,43 @@ def submit_response(request):
     if request.method=='POST':
         session_id=request.POST.get('session_id')
         question_id=request.POST.get('question_id')
-        answer_id=request.POST.get('answer_id')
+     #   answer_id=request.POST.get('answer_id')
 
         session=get_object_or_404(TestSession, id=session_id, candidate=request.user)
         question=get_object_or_404(Question, id=question_id, test=session.test)
-        answer=get_object_or_404(Answer, id=answer_id, question=question)
+     #   answer=get_object_or_404(Answer, id=answer_id, question=question)
         Response.objects.create(
             session=session,
             question=question,
-            answer=answer
+        #    answer=answer,
         )
         return JsonResponse({'status': "success"})
-    return JsonResponse({'status': 'error'}, status=400)
+    return render(request, 'core/result.html')
+    #return JsonResponse({'status': 'error'}, status=400)
 
 def result(request, session_id):
-    session=get_object_or_404(TestSession, id=session_id, candidate=request.user)
+    session=get_object_or_404(TestSession, id=session_id, candidate=request.user, is_completed=True)
+
     try:
-        result=Result.objects.get(session=session)
-    except Result.DoesNotExist:
-        return render(request, 'core/no_result.html', {'session':session})
+        with transaction.atomic():
+            scorer=BigFiveScorer(session)
+            results=scorer.calculate_results()
+
+            result, created = Result.objects.update_or_create(
+                session=session,
+                defaults={
+                    'raw_scores': results['raw_scores'],
+                    'normalized_scores': results['normalized_scores'],
+                    'interpretation': results['interpretation'],
+                    'recommendations': results['recommendations'],
+                    'theoretical_scores': results.get('theoretical_scores', {}),
+                    'scale_evaluations': results.get('scale_evaluations', {}),
+                    'scenario_analysis': results.get('scenario_analysis', {})
+                }
+            )
+            print(f"result interpretation items is {result.interpretation.items()}" )
+    except Exception as e:
+        return render(request, 'core/calculation_error.html', {'error':str(e)})
   
     return render(request, 'core/result.html', {'result': result, 'session':session})
    
@@ -211,4 +265,3 @@ def ai_chat(request):
     ai_response = get_gemini_response(user_prompt) if user_prompt else ""
     
     return render(request, "core/chat.html", {"response": ai_response, "prompt": user_prompt})
-
