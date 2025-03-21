@@ -157,13 +157,17 @@ def result(request, session_id):
                     'scenario_analysis': results.get('scenario_analysis', {})
                 }
             )
+            
             print(f"result interpretation items is {result.interpretation.items()}" )
+
     except Exception as e:
         return render(request, 'core/calculation_error.html', {'error':str(e)})
   
     return render(request, 'core/result.html', {'result': result, 'session':session})
    
    
+   
+
    
   #  result=get_object_or_404(Result, session=session)
  
